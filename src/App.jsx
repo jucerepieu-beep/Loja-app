@@ -1647,4 +1647,477 @@ function AdminPanel({ catalog, setCatalog, onBack }) {
               onChange={(e) => updateSettings({ pixKey: e.target.value })}
               className="w-full rounded-xl border-2 px-3 py-2 text-sm text-[#2B2650] outline-none focus:border-[#7C6FF0] transition"
               style={{ borderColor: "#EFEAFF" }}
-           
+            />
+            <p className="text-[11px] text-[#B6B0DA] mt-1.5">
+              Essa chave aparece com um botão de copiar para o anunciante na tela de confirmação do pedido.
+            </p>
+          </div>
+
+          {/* Gestão de planos */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold text-[#2B2650] font-display">Planos de divulgação</p>
+              <button
+                onClick={addPlan}
+                className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-full text-white transition"
+                style={{ backgroundColor: "#7C6FF0" }}
+              >
+                <Plus size={14} /> Novo plano
+              </button>
+            </div>
+            <div className="flex flex-col gap-2">
+              {plans.map((plan) => (
+                <div key={plan.id} className="flex items-center gap-2 rounded-xl border-2 p-3" style={{ backgroundColor: "#FFFFFF", borderColor: plan.active ? "#EFEAFF" : "#F4C6D6" }}>
+                  <div className="flex-1 flex items-center gap-2">
+                    <div>
+                      <label className="block text-[10px] text-[#B6B0DA]">Dias</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={plan.days}
+                        onChange={(e) => updatePlan(plan.id, { days: parseInt(e.target.value) || 0 })}
+                        className="w-16 rounded-lg border-2 px-2 py-1 text-sm text-[#2B2650] outline-none focus:border-[#7C6FF0]"
+                        style={{ borderColor: "#EFEAFF" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-[#B6B0DA]">Preço (R$)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={plan.price}
+                        onChange={(e) => updatePlan(plan.id, { price: parseFloat(e.target.value) || 0 })}
+                        className="w-20 rounded-lg border-2 px-2 py-1 text-sm text-[#2B2650] outline-none focus:border-[#7C6FF0]"
+                        style={{ borderColor: "#EFEAFF" }}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updatePlan(plan.id, { active: !plan.active })}
+                    aria-label={plan.active ? "Bloquear plano" : "Ativar plano"}
+                    className="p-2 rounded-lg transition"
+                    style={{ color: plan.active ? "#2DD4A7" : "#F45B9C", backgroundColor: plan.active ? "#2DD4A71A" : "#F45B9C1A" }}
+                  >
+                    {plan.active ? <BadgeCheck size={16} /> : <Ban size={16} />}
+                  </button>
+                  <button onClick={() => deletePlan(plan.id)} className="p-2 text-[#B6B0DA] hover:text-[#F45B9C] transition">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-[#B6B0DA] mt-2">
+              Planos bloqueados (🚫) não aparecem mais para novos anunciantes, mas continuam salvos.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {tab === "visits" && <VisitsPanel />}
+    </div>
+  );
+}
+
+// ---------- Painel ADM: contador de visitantes ----------
+function VisitsPanel() {
+  const [stats, setStats] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await getVisitStats();
+        setStats(result);
+      } catch (err) {
+        setError(true);
+      }
+    })();
+  }, []);
+
+  if (error) {
+    return (
+      <p className="text-xs text-[#B6B0DA] text-center py-6">
+        Não foi possível carregar os dados de visitas agora.
+      </p>
+    );
+  }
+
+  if (!stats) {
+    return <p className="text-xs text-[#B6B0DA] text-center py-6">Carregando...</p>;
+  }
+
+  const last7 = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    return { key, count: stats.daily[key] || 0 };
+  });
+  const maxCount = Math.max(1, ...last7.map((d) => d.count));
+
+  return (
+    <div>
+      <div
+        className="rounded-2xl border-2 p-5 mb-5 text-center"
+        style={{ backgroundColor: "#FFFFFF", borderColor: "#EFEAFF" }}
+      >
+        <p className="text-xs text-[#7A759E] mb-1">Total de visitas desde o início</p>
+        <p className="text-4xl font-bold text-[#2B2650] font-display">{stats.total}</p>
+      </div>
+
+      <div className="rounded-2xl border-2 p-4" style={{ backgroundColor: "#FFFFFF", borderColor: "#EFEAFF" }}>
+        <p className="text-sm font-bold text-[#2B2650] font-display mb-3">Últimos 7 dias</p>
+        <div className="flex flex-col gap-2">
+          {last7.reverse().map((d) => (
+            <div key={d.key} className="flex items-center gap-3">
+              <span className="text-xs text-[#7A759E] w-16 shrink-0">
+                {d.key.split("-").reverse().slice(0, 2).join("/")}
+              </span>
+              <div className="flex-1 h-4 rounded-full overflow-hidden" style={{ backgroundColor: "#F0ECFF" }}>
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${(d.count / maxCount) * 100}%`, backgroundColor: "#7C6FF0" }}
+                />
+              </div>
+              <span className="text-xs font-semibold text-[#2B2650] w-6 text-right">{d.count}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="text-[11px] text-[#B6B0DA] mt-3 text-center">
+        Cada pessoa é contada 1 vez por visita à loja (mesmo se navegar entre várias páginas).
+      </p>
+    </div>
+  );
+}
+
+// ---------- App raiz ----------
+export default function LojaHome() {
+  const [view, setView] = useState("home");
+  const [catalog, setCatalog] = useState(DEFAULT_CATALOG);
+  const [loading, setLoading] = useState(true);
+  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error
+  const [openItem, setOpenItem] = useState(null);
+  const [dark, setDark] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+
+  // carrega catálogo salvo (compartilhado — visível para todos que acessarem a loja)
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await storage.get("catalog");
+        if (result && result.value) {
+          setCatalog(JSON.parse(result.value));
+        }
+      } catch (err) {
+        // ainda não existe catálogo salvo — usa os dados de exemplo
+      } finally {
+        setLoading(false);
+      }
+    })();
+    registerVisit();
+  }, []);
+
+  // salva automaticamente quando o catálogo muda (depois do carregamento inicial)
+  const firstRun = useRef(true);
+  const saveCatalog = async (data, attempt = 1) => {
+    setSaveState("saving");
+    try {
+      const result = await storage.set("catalog", JSON.stringify(data));
+      if (result) {
+        setSaveState("saved");
+      } else if (attempt < 3) {
+        setTimeout(() => saveCatalog(data, attempt + 1), 800 * attempt);
+      } else {
+        setSaveState("error");
+      }
+    } catch (err) {
+      if (attempt < 3) {
+        setTimeout(() => saveCatalog(data, attempt + 1), 800 * attempt);
+      } else {
+        setSaveState("error");
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (loading) return;
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    saveCatalog(catalog);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog, loading]);
+
+  if (loading) {
+    return (
+      <div
+        className="min-h-screen w-full flex items-center justify-center"
+        style={{ backgroundColor: "#FAF8FF" }}
+      >
+        <Loader2 size={28} className="animate-spin text-[#7C6FF0]" />
+      </div>
+    );
+  }
+
+  if (openItem) {
+    return <AppViewer item={openItem} onClose={() => setOpenItem(null)} />;
+  }
+
+  return (
+    <div
+      className="min-h-screen w-full flex flex-col items-center px-4 py-8 sm:py-12 transition-colors duration-300"
+      style={{
+        backgroundColor: view === "home" ? (dark ? "#0B0B1E" : "#FAF8FF") : "#FAF8FF",
+        backgroundImage:
+          view === "home" && dark
+            ? "radial-gradient(circle at 20% 0%, rgba(124,111,240,0.25), transparent 45%), radial-gradient(circle at 85% 15%, rgba(45,212,167,0.15), transparent 40%)"
+            : "none",
+        fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;800&family=Inter:wght@400;500;600&display=swap');
+        .font-display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.01em; }
+      `}</style>
+
+      <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} onNavigate={setView} dark={view === "home" && dark} />
+
+      <div className="w-full max-w-md md:max-w-2xl lg:max-w-3xl transition-[max-width]">
+        <div className="flex items-center justify-between mb-6">
+          {view === "home" ? (
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+                style={{ background: "linear-gradient(135deg, #7C6FF0, #4A9DFF, #2DD4A7)" }}
+              >
+                <Sparkles size={18} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-base font-bold font-display leading-tight" style={{ color: dark ? "#F5F3FF" : "#2B2650" }}>
+                  Central de Mini Apps
+                </h1>
+                <p className="text-[10px]" style={{ color: dark ? "#7A75A8" : "#7A759E" }}>
+                  Tudo em um só lugar. Rápido, leve e online!
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-[11px] tracking-[0.3em] uppercase text-[#7C6FF0] font-semibold">Loja de Apps</p>
+              <h1 className="text-2xl font-bold text-[#2B2650] font-display -mt-0.5">O que vamos abrir hoje?</h1>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 shrink-0">
+            {view === "home" && (
+              <button
+                aria-label="Alternar tema"
+                onClick={() => setDark((d) => !d)}
+                className="w-9 h-9 rounded-full border flex items-center justify-center transition"
+                style={{
+                  backgroundColor: dark ? "#151533" : "#FFFFFF",
+                  borderColor: dark ? "#2A2A55" : "#EFEAFF",
+                  color: dark ? "#F5F3FF" : "#7A759E",
+                }}
+              >
+                {dark ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+            )}
+            <button
+              aria-label="Menu"
+              onClick={() => setMenuOpen(true)}
+              className="w-9 h-9 rounded-full border flex items-center justify-center transition"
+              style={{
+                backgroundColor: view === "home" && dark ? "#151533" : "#FFFFFF",
+                borderColor: view === "home" && dark ? "#2A2A55" : "#EFEAFF",
+                color: view === "home" && dark ? "#F5F3FF" : "#7A759E",
+              }}
+            >
+              <Menu size={16} />
+            </button>
+            <button
+              aria-label="Painel do administrador"
+              onClick={() => setView(view === "adm" ? "home" : "adm")}
+              className="w-9 h-9 rounded-full border flex items-center justify-center transition"
+              style={{
+                backgroundColor: view === "home" && dark ? "#151533" : "#FFFFFF",
+                borderColor: view === "home" && dark ? "#2A2A55" : "#EFEAFF",
+                color: view === "home" && dark ? "#F5F3FF" : "#7A759E",
+              }}
+            >
+              <Settings size={16} />
+            </button>
+          </div>
+        </div>
+
+        {view === "home" && (
+          <div key="home">
+            {/* Ícone e título de destaque */}
+            <div className="flex flex-col items-center text-center mb-7">
+              <div
+                className="w-20 h-20 rounded-3xl flex items-center justify-center mb-4 shadow-lg"
+                style={{ background: "linear-gradient(135deg, #7C6FF0, #4A9DFF 55%, #2DD4A7)" }}
+              >
+                <Sparkles size={34} className="text-white" />
+              </div>
+              <h2 className="text-3xl font-extrabold font-display leading-tight" style={{ color: dark ? "#F5F3FF" : "#2B2650" }}>
+                Central de{" "}
+                <span
+                  style={{
+                    background: "linear-gradient(90deg, #7C6FF0, #4A9DFF, #2DD4A7)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  Mini Apps
+                </span>
+              </h2>
+              <p className="text-sm mt-2" style={{ color: dark ? "#A8A3D9" : "#7A759E" }}>
+                Jogos e aplicativos úteis direto no seu navegador.
+              </p>
+              <p className="text-xs font-semibold mt-1" style={{ color: "#2DD4A7" }}>
+                Sem instalação, sem complicação.
+              </p>
+            </div>
+
+            {/* Botões de categoria estilo cartão grande */}
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => setView("jogos")}
+                className="rounded-2xl p-5 text-left flex items-center gap-4 transition active:scale-[0.98]"
+                style={{ background: "linear-gradient(135deg, #6D5BE8, #4634B8)" }}
+              >
+                <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                  <Gamepad2 size={26} className="text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-white font-bold font-display text-lg">Jogos</p>
+                  <p className="text-white/70 text-xs">Diversão garantida!</p>
+                </div>
+                <ChevronRight size={20} className="text-white/80" />
+              </button>
+
+              <button
+                onClick={() => setView("apps")}
+                className="rounded-2xl p-5 text-left flex items-center gap-4 transition active:scale-[0.98]"
+                style={{ background: "linear-gradient(135deg, #1FAE85, #0E8064)" }}
+              >
+                <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                  <Wrench size={26} className="text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-white font-bold font-display text-lg">Apps Úteis</p>
+                  <p className="text-white/70 text-xs">Ferramentas para o dia a dia!</p>
+                </div>
+                <ChevronRight size={20} className="text-white/80" />
+              </button>
+            </div>
+
+            {/* Carrossel de patrocinadores */}
+            <div className="mt-5">
+              <SponsorCarousel sponsors={sponsorsFor(catalog.sponsors, "home")} speed={catalog.settings?.speed} size={catalog.settings?.size} />
+            </div>
+
+            {/* Divulgue seu negócio */}
+            <button
+              onClick={() => setView("anuncie")}
+              className="w-full mt-4 rounded-2xl p-4 flex items-center gap-3 text-left transition active:scale-[0.98]"
+              style={{ background: "linear-gradient(135deg, #FFC145, #FF8A45)" }}
+            >
+              <div className="w-11 h-11 rounded-xl bg-white/25 flex items-center justify-center shrink-0">
+                <Megaphone size={20} className="text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-white font-bold font-display text-sm">Divulgue seu negócio aqui</p>
+                <p className="text-white/80 text-xs">Planos a partir de R$ 70,00</p>
+              </div>
+              <ChevronRight size={18} className="text-white/90" />
+            </button>
+
+            {/* Selos de confiança */}
+            <FeatureBadges dark={dark} />
+
+            <p
+              className="text-center text-xs mt-8 flex items-center justify-center gap-1.5"
+              style={{ color: dark ? "#7A75A8" : "#B6B0DA" }}
+            >
+              Feito para você <Heart size={12} className="text-[#F45B9C]" fill="#F45B9C" /> Prático, moderno e sempre ao seu alcance.
+            </p>
+          </div>
+        )}
+
+        {view === "jogos" && (
+          <div key="jogos">
+            <ListView title="Jogos" subtitle="Escolha um e divirta-se agora mesmo" items={catalog.games} accent="#FF6B4A" onBack={() => setView("home")} onOpen={setOpenItem} />
+          </div>
+        )}
+
+        {view === "apps" && (
+          <div key="apps">
+            <ListView
+              title="Apps Úteis"
+              subtitle="Ferramentas prontas para usar"
+              items={catalog.apps}
+              accent="#2DD4A7"
+              onBack={() => setView("home")}
+              onOpen={setOpenItem}
+              sponsors={sponsorsFor(catalog.sponsors, "apps")}
+              carouselSettings={catalog.settings}
+            />
+          </div>
+        )}
+
+        {view === "anuncie" && (
+          <div key="anuncie">
+            <AdvertisePage
+              plans={catalog.plans || []}
+              pixKey={catalog.settings?.pixKey}
+              onSubmit={(request) => {
+                setCatalog((prev) => ({
+                  ...prev,
+                  pendingSponsors: [...(prev.pendingSponsors || []), request],
+                }));
+              }}
+              onBack={() => setView("home")}
+            />
+          </div>
+        )}
+
+        {view === "adm" && (
+          <div key="adm">
+            {!adminUnlocked ? (
+              <AdminLogin
+                correctPassword={catalog.settings?.admPassword || "admin123"}
+                onUnlock={() => setAdminUnlocked(true)}
+                onBack={() => setView("home")}
+              />
+            ) : (
+              <AdminPanel catalog={catalog} setCatalog={setCatalog} onBack={() => setView("home")} />
+            )}
+          </div>
+        )}
+
+        {saveState === "saving" && (
+          <p className="text-center text-[11px] mt-4" style={{ color: view === "home" && dark ? "#7A75A8" : "#B6B0DA" }}>
+            Salvando…
+          </p>
+        )}
+        {saveState === "error" && (
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <p className="text-[11px] text-[#F45B9C]">Não foi possível salvar agora.</p>
+            <button
+              onClick={() => saveCatalog(catalog)}
+              className="text-[11px] font-semibold underline text-[#7C6FF0]"
+            >
+              Tentar de novo
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
